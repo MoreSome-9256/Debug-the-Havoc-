@@ -139,27 +139,6 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: DH_UI_1_2
-      rect:
-        serializedVersion: 2
-        x: 0
-        y: 1667
-        width: 10
-        height: 7
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: fe69cd4eee0d26544bbcfe46eeb3978d
-      internalID: 1913395543
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
       name: DH_UI_1_3
       rect:
         serializedVersion: 2
@@ -222,6 +201,48 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: DH_UI_1_5
+      rect:
+        serializedVersion: 2
+        x: 1326
+        y: 637
+        width: 164
+        height: 164
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: df55ee1d19122ae4da8f20e59a1a9f92
+      internalID: 1532078643
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: DH_UI_1_7
+      rect:
+        serializedVersion: 2
+        x: 1562
+        y: 624
+        width: 167
+        height: 168
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: a22ead727effe394d876c27376922ece
+      internalID: -1830107653
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -235,11 +256,16 @@ TextureImporter:
     nameFileIdTable:
       DH_UI_1_0: 1380339973
       DH_UI_1_1: -2088953234
+      DH_UI_1_10: 546753899
+      DH_UI_1_11: 1015973412
       DH_UI_1_2: 1913395543
       DH_UI_1_3: -1483204171
       DH_UI_1_4: 1629756593
       DH_UI_1_5: 1532078643
       DH_UI_1_6: 1187052895
+      DH_UI_1_7: -1830107653
+      DH_UI_1_8: 740614283
+      DH_UI_1_9: 1992337166
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
