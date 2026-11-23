@@ -1,0 +1,50 @@
+# =============== Unity 核心缓存目录 ===============
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# MemoryCaptures 内存快照
+/[Mm]emoryCaptures/
+
+# 录屏插件输出目录
+/[Rr]ecordings/
+
+# 忽略自带的 .gitignore（如果有）
+/Assets/AssetStoreTools*
+
+# =============== IDE 与编译器自动生成文件 ===============
+.vs/
+.gradle/
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# =============== 系统与杂项 ===============
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+.DS_Store
+Thumbs.db
