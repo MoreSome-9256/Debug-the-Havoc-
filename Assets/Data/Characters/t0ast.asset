@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5ac5e879c886a14b865a8c99d5e282f, type: 3}
+  m_Name: t0ast
+  m_EditorClassIdentifier: 
+  characterId: t0ast
+  displayName: T0_blast
+  avatarSprite: {fileID: 0}
+  nameColor: {r: 1, g: 0.19215688, b: 0.19215688, a: 1}
+  shadowColor: {r: 1, g: 0.19339621, b: 0.19339621, a: 1}
