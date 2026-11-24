@@ -89,7 +89,7 @@ public class DraggableWindow : MonoBehaviour, IPointerDownHandler
         }
     }
 
-    private void OnDrag(PointerEventData eventData)
+    public virtual void OnDrag(PointerEventData eventData)
     {
         if (!_isDragging) return;
 
@@ -148,7 +148,7 @@ public class DraggableWindow : MonoBehaviour, IPointerDownHandler
     public virtual void OpenWindow()
     {
         gameObject.SetActive(true);
-        FocusWindow();
+        transform.SetAsLastSibling();
     }
 
     public virtual void CloseWindow()

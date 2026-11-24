@@ -225,8 +225,34 @@ public class ChatWindowController : DraggableWindow
 
     private void OpenCodeWindow()
     {
-        if (codeEditorWindow == null) return;
-        codeEditorWindow.gameObject.SetActive(true);
-        codeEditorWindow.transform.SetAsLastSibling();
+        if (codeEditorWindow != null)
+            codeEditorWindow.OpenWindow();
+    }
+
+    public override void OnDrag(UnityEngine.EventSystems.PointerEventData eventData)
+    {
+        base.OnDrag(eventData);
+
+        if (_isCollapsed)
+        {
+            // 折叠状态下死锁 Y 轴贴紧屏幕底边，同时限制 X 轴不拖出屏幕左右边界
+            float clampedX = windowRect.anchoredPosition.x;
+            if (windowRect.parent is RectTransform parentRect)
+            {
+                float halfParentWidth = parentRect.rect.width * 0.5f;
+                float halfWinWidth = windowRect.rect.width * 0.5f;
+                float minX = -halfParentWidth + halfWinWidth - 60f;
+                float maxX = halfParentWidth - halfWinWidth + 60f;
+                if (minX < maxX)
+                    clampedX = Mathf.Clamp(clampedX, minX, maxX);
+            }
+
+            windowRect.anchoredPosition = new Vector2(clampedX, collapsedPosY);
+        }
+        else
+        {
+            // 展开状态下拖拽时，同步更新记忆坐标，防止下次折叠再展开时跳回旧位置
+            _expandedAnchoredPos = windowRect.anchoredPosition;
+        }
     }
 }

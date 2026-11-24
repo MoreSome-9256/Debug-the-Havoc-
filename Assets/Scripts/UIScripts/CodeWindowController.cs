@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using DG.Tweening;
 
 public class CodeWindowController : DraggableWindow
 {
@@ -43,6 +44,13 @@ public class CodeWindowController : DraggableWindow
     [SerializeField] private RectTransform contentHistory;
     [SerializeField] private CodeHistoryItemUI historyItemPrefab;
 
+    [Header("窗口开关动效")]
+    [SerializeField] private CanvasGroup windowCanvasGroup;
+    [SerializeField] private float openDuration = 0.24f;
+    [SerializeField] private float closeDuration = 0.16f;
+
+    private Sequence _windowTweenSeq;
+
     public event Action<string> OnRunCodeClicked;
 
     private RectTransform _targetLeftTab;
@@ -78,7 +86,7 @@ public class CodeWindowController : DraggableWindow
         }
 
         if (btnClose != null)
-            btnClose.onClick.AddListener(() => gameObject.SetActive(false));
+            btnClose.onClick.AddListener(CloseWindow);
 
         if (tabInfo != null) tabInfo.onClick.AddListener(() => SwitchLeftTab(true, false));
         if (tabTools != null) tabTools.onClick.AddListener(() => SwitchLeftTab(false, false));
@@ -190,5 +198,73 @@ public class CodeWindowController : DraggableWindow
     public void ClearOutput()
     {
         if (txtOutputLog != null) txtOutputLog.text = string.Empty;
+    }
+
+    public override void OpenWindow()
+    {
+        // 如果已经处于激活且完整展开状态，直接置顶并轻微跳动提示即可
+        if (gameObject.activeSelf && (_windowTweenSeq == null || !_windowTweenSeq.IsActive()) && transform.localScale.y > 0.99f)
+        {
+            transform.SetAsLastSibling();
+            transform.DOKill();
+            transform.DOPunchScale(new Vector3(0.015f, 0.015f, 0f), 0.2f, 6, 0.5f);
+            return;
+        }
+
+        // 调用父类方法激活物体并置顶层级
+        base.OpenWindow();
+
+        _windowTweenSeq?.Kill();
+        _windowTweenSeq = DOTween.Sequence();
+
+        // 初始状态：压扁成一条水平扫描线 + 透明
+        transform.localScale = new Vector3(0.82f, 0.03f, 1f);
+        if (windowCanvasGroup != null)
+        {
+            windowCanvasGroup.alpha = 0f;
+            windowCanvasGroup.blocksRaycasts = false;
+        }
+
+        float step1 = openDuration * 0.35f;
+        _windowTweenSeq.Append(transform.DOScaleX(1f, step1).SetEase(Ease.OutQuart));
+        if (windowCanvasGroup != null)
+            _windowTweenSeq.Join(windowCanvasGroup.DOFade(1f, step1));
+
+        float step2 = openDuration * 0.65f;
+        _windowTweenSeq.Append(transform.DOScaleY(1f, step2).SetEase(Ease.OutBack, 1.15f));
+
+        _windowTweenSeq.OnComplete(() =>
+        {
+            if (windowCanvasGroup != null)
+                windowCanvasGroup.blocksRaycasts = true;
+        });
+    }
+
+    public override void CloseWindow()
+    {
+        if (!gameObject.activeSelf) return;
+
+        _windowTweenSeq?.Kill();
+        _windowTweenSeq = DOTween.Sequence();
+
+        if (windowCanvasGroup != null)
+            windowCanvasGroup.blocksRaycasts = false;
+
+        _windowTweenSeq.Join(transform.DOScaleY(0.02f, closeDuration).SetEase(Ease.InQuart))
+                       .Join(transform.DOScaleX(0.9f, closeDuration).SetEase(Ease.InQuad));
+
+        if (windowCanvasGroup != null)
+            _windowTweenSeq.Join(windowCanvasGroup.DOFade(0f, closeDuration * 0.9f));
+
+        _windowTweenSeq.OnComplete(() =>
+        {
+            base.CloseWindow();
+            transform.localScale = Vector3.one;
+            if (windowCanvasGroup != null)
+            {
+                windowCanvasGroup.alpha = 1f;
+                windowCanvasGroup.blocksRaycasts = true;
+            }
+        });
     }
 }
