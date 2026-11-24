@@ -8,7 +8,7 @@ public class DraggableWindow : MonoBehaviour, IPointerDownHandler
     [Header("窗口基础配置")]
     [SerializeField] private WindowLayer windowLayer = WindowLayer.Social;
     [SerializeField] private RectTransform dragHandle;
-    [SerializeField] private bool clampToScreen = true;
+    [SerializeField] protected bool clampToScreen = true;
     [SerializeField] private float screenPadding = 10f;
 
     [Header("异形边缘精准点击 (需贴图开启 Read/Write)")]
@@ -21,6 +21,8 @@ public class DraggableWindow : MonoBehaviour, IPointerDownHandler
 
     private Vector2 _lastPointerLocalPos;
     private bool _isDragging;
+
+    protected RectTransform windowRect => GetComponent<RectTransform>();
 
     protected virtual void Awake()
     {
