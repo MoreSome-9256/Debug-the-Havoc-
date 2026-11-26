@@ -11,6 +11,15 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Button btnMascotCat;
     [SerializeField] private MenuSkewButtonAnimator[] menuButtons;
 
+    [Header("破窗出场：黑猫 Glitch 与斜上方跳跃")]
+    [SerializeField] private Material glitchMaterialTemplate;   // 拖入之前的 Mat_UI_Glitch
+    [Tooltip("斜上方冲刺的额外过冲偏移（正 X 向右、正 Y 向上）")]
+    [SerializeField] private Vector2 catLeapOvershoot = new Vector2(55f, 110f);
+    [SerializeField] private float catGlitchDuration = 0.28f;
+
+    private Material _catGlitchMat;
+    private static readonly int GlitchIntensityId = Shader.PropertyToID("_GlitchIntensity");
+
     [Header("功能按钮事件绑定")]
     [SerializeField] private Button btnInitialize;   // 新建连接
     [SerializeField] private Button btnReconnect;    // 继续潜入
@@ -26,19 +35,164 @@ public class MainMenuController : MonoBehaviour
     private Tween _catTiltTween;
     private Vector2 _catBasePos;
 
+    [Header("可选：背景底框与视差联动")]
+    [SerializeField] private RectTransform window1Rect;
+    [SerializeField] private MenuParallaxController parallaxController;
+
+    private Vector3 _titleBaseLocalPos;
+    private Vector3 _catBaseLocalPos;
+    private Vector3 _window1BaseLocalPos;
+    private bool _isBurstTriggered = false;
+
+    private void Awake()
+    {
+        if (titleLogoRect != null) _titleBaseLocalPos = titleLogoRect.localPosition;
+        if (mascotCatRect != null)
+        {
+            _catBaseLocalPos = mascotCatRect.localPosition;
+            _catBasePos = mascotCatRect.anchoredPosition;
+        }
+        if (window1Rect != null) _window1BaseLocalPos = window1Rect.localPosition;
+
+        // 自动获取 Cat 节点下的所有 Image（含橙绿阴影和本体），统一挂上同一个 Glitch 材质实例
+        if (glitchMaterialTemplate != null && mascotCatRect != null)
+        {
+            _catGlitchMat = new Material(glitchMaterialTemplate);
+            _catGlitchMat.SetFloat(GlitchIntensityId, 0f);
+
+            Image[] catImages = mascotCatRect.GetComponentsInChildren<Image>(true);
+            foreach (var img in catImages)
+            {
+                img.material = _catGlitchMat;
+            }
+        }
+    }
+    private void OnDestroy()
+    {
+        if (_catGlitchMat != null) Destroy(_catGlitchMat);
+    }
+
     private void Start()
     {
         if (mascotCatRect != null)
         {
-            _catBasePos = mascotCatRect.anchoredPosition;
-            // 开启异形像素点击
             Image catImg = mascotCatRect.GetComponent<Image>();
             if (catImg != null && catImg.sprite != null && catImg.sprite.texture.isReadable)
                 catImg.alphaHitTestMinimumThreshold = 0.05f;
         }
 
         BindButtonEvents();
-        PlayMenuEntrance();
+
+        // 如果不是由 CMD 破窗触发的（例如二次启动跳过开场），才走常规入场
+        if (!_isBurstTriggered)
+        {
+            PlayMenuEntrance();
+        }
+    }
+
+    /// <summary>
+    /// 破窗瞬间调用：所有主菜单元素从 CMD 窗口中心错峰弹出
+    /// </summary>
+    public void PlayBurstEntranceFromWorldPos(Vector3 originWorldPos)
+    {
+        _isBurstTriggered = true;
+        _entranceSeq?.Kill();
+        _entranceSeq = DOTween.Sequence();
+
+        if (parallaxController != null) parallaxController.SetParallaxEnabled(false);
+
+        if (menuCanvasGroup != null)
+        {
+            menuCanvasGroup.alpha = 1f;
+            menuCanvasGroup.blocksRaycasts = true;
+        }
+
+        // 1. 黑猫带着 Glitch 猛地向斜上方跃出，再落回屏幕中央
+        if (mascotCatRect != null)
+        {
+            // 起跳瞬间触发 Glitch 故障闪烁
+            if (_catGlitchMat != null)
+            {
+                StartCoroutine(PlayCatGlitchBurst(catGlitchDuration, 1.0f));
+            }
+
+            mascotCatRect.position = originWorldPos;
+            mascotCatRect.localScale = Vector3.one * 0.6f;
+            mascotCatRect.localRotation = Quaternion.Euler(0f, 0f, -12f);
+
+            // 计算斜上方最高点（在最终落点基础上再向右上冲出去一段）
+            Vector3 apexLocalPos = _catBaseLocalPos + (Vector3)catLeapOvershoot;
+
+            Sequence catLeapSeq = DOTween.Sequence();
+            // 阶段 A：向斜上方爆发冲刺
+            catLeapSeq.Append(mascotCatRect.DOLocalMove(apexLocalPos, 0.22f).SetEase(Ease.OutQuart));
+            catLeapSeq.Join(mascotCatRect.DOScale(1.08f, 0.22f).SetEase(Ease.OutQuad));
+            catLeapSeq.Join(mascotCatRect.DOLocalRotate(new Vector3(0f, 0f, 6f), 0.22f).SetEase(Ease.OutQuad));
+
+            // 阶段 B：从斜上方轻盈回落到主菜单中心位
+            catLeapSeq.Append(mascotCatRect.DOLocalMove(_catBaseLocalPos, 0.24f).SetEase(Ease.InOutQuad));
+            catLeapSeq.Join(mascotCatRect.DOScale(1f, 0.24f).SetEase(Ease.OutBack, 1.2f));
+            catLeapSeq.Join(mascotCatRect.DOLocalRotate(Vector3.zero, 0.24f).SetEase(Ease.OutQuad));
+
+            _entranceSeq.Insert(0f, catLeapSeq);
+        }
+
+        // 2. 背景底框 Window1 紧随其后展开
+        if (window1Rect != null)
+        {
+            window1Rect.position = originWorldPos;
+            window1Rect.localScale = Vector3.zero;
+            _entranceSeq.Insert(0.03f, window1Rect.DOLocalMove(_window1BaseLocalPos, 0.42f).SetEase(Ease.OutQuart));
+            _entranceSeq.Insert(0.03f, window1Rect.DOScale(1f, 0.38f).SetEase(Ease.OutBack, 1.1f));
+        }
+
+        // 3. 游戏主标题从中心弹出
+        if (titleLogoRect != null)
+        {
+            titleLogoRect.position = originWorldPos;
+            titleLogoRect.localScale = Vector3.zero;
+            _entranceSeq.Insert(0.05f, titleLogoRect.DOLocalMove(_titleBaseLocalPos, 0.44f).SetEase(Ease.OutBack, 1.2f));
+            _entranceSeq.Insert(0.05f, titleLogoRect.DOScale(1f, 0.4f).SetEase(Ease.OutBack, 1.3f));
+        }
+
+        // 4. 五个斜切选项按极短间隔依次从中心炸出
+        if (menuButtons != null)
+        {
+            for (int i = 0; i < menuButtons.Length; i++)
+            {
+                if (menuButtons[i] == null) continue;
+                float delay = 0.06f + i * 0.04f;
+                _entranceSeq.Insert(delay, menuButtons[i].PlayBurstFromWorldPos(originWorldPos, 0.42f));
+            }
+        }
+
+        // 全部就位后，启动黑猫漂浮循环并重新校准开启 2.5D 视差
+        _entranceSeq.OnComplete(() =>
+        {
+            StartCatIdleFloat();
+            if (parallaxController != null)
+            {
+                parallaxController.RecordBasePositions();
+                parallaxController.SetParallaxEnabled(true);
+            }
+        });
+    }
+    private System.Collections.IEnumerator PlayCatGlitchBurst(float duration, float peakIntensity)
+    {
+        if (_catGlitchMat == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            float decay = 1f - (elapsed / duration);
+            float val = UnityEngine.Random.Range(0.4f, 1f) * peakIntensity * decay;
+            _catGlitchMat.SetFloat(GlitchIntensityId, val);
+
+            yield return new WaitForSeconds(0.03f);
+            elapsed += 0.03f;
+        }
+
+        _catGlitchMat.SetFloat(GlitchIntensityId, 0f);
     }
 
     private void BindButtonEvents()

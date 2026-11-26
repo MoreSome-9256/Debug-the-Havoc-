@@ -102,6 +102,34 @@ public class MenuSkewButtonAnimator : MonoBehaviour, IPointerEnterHandler, IPoin
         }
     }
 
+    /// <summary>
+    /// 从指定世界坐标（如 CMD 窗口中心）缩放弹出到原始排位
+    /// </summary>
+    public Tween PlayBurstFromWorldPos(Vector3 originWorldPos, float duration)
+    {
+        _isInteractable = false;
+        _selfRect.DOKill();
+        visualRootRect.DOKill();
+
+        if (shadowImage != null)
+        {
+            shadowImage.color = normalShadowColor;
+            _shadowRect.anchoredPosition = _baseShadowPos;
+            _shadowRect.localScale = Vector3.one;
+        }
+
+        // 先把按钮瞬间挪到 CMD 中心并缩成 0
+        _selfRect.position = originWorldPos;
+        visualRootRect.localScale = Vector3.zero;
+
+        Sequence seq = DOTween.Sequence();
+        seq.Join(_selfRect.DOLocalMove(_baseLocalPos, duration).SetEase(Ease.OutBack, 1.15f));
+        seq.Join(visualRootRect.DOScale(normalScale, duration * 0.85f).SetEase(Ease.OutBack, 1.3f));
+        seq.OnComplete(() => _isInteractable = true);
+
+        return seq;
+    }
+
     public void OnPointerExit(PointerEventData eventData)
     {
         if (!_isInteractable) return;

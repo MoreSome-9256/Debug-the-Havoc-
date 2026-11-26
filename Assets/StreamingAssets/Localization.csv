@@ -1,0 +1,12 @@
+Key,zh,en
+intro_cmd_warning,"""{path}> run debug_the_havoc.exe --force
+[WARN] 检测到未签名的野生脚本，可能包含大量垃圾话与不可逆的桌面入侵。
+[DH_BOT] 别听杀软瞎叫，点继续就完事了，出事算我们的（才怪）。
+
+是否无视风险继续启动？","""{path}> run debug_the_havoc.exe --force
+[WARN] Unsigned rogue script detected. May contain excessive trash talk and irreversible desktop intrusion.
+[DH_BOT] Ignore the antivirus whining. Just hit continue, we've got you covered (probably).
+
+Ignore risk and proceed?"
+intro_cmd_yes,[Y] 无视风险，强行执行,[Y] Ignore Risk & Execute
+intro_cmd_no,[N] 退出,[N] Abort
