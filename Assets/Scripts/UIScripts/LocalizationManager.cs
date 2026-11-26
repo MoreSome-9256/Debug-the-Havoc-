@@ -84,15 +84,39 @@ public static class LocalizationManager
             return;
         }
 
-        string content;
+        // 1. 以共享只读模式读取原始字节（WPS/Excel 开着也能读）
+        byte[] rawBytes;
         using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-        using (var sr = new StreamReader(fs, Encoding.UTF8))
         {
-            content = sr.ReadToEnd();
+            rawBytes = new byte[fs.Length];
+            int totalRead = 0;
+            while (totalRead < rawBytes.Length)
+            {
+                int read = fs.Read(rawBytes, totalRead, rawBytes.Length - totalRead);
+                if (read == 0) break;
+                totalRead += read;
+            }
         }
-        List<List<string>> rows = ParseCsv(content);
 
-        // 跳过第 0 行表头 (Key, zh, en)
+        // 2. 优先按严格 UTF-8 解码，失败则自动回退到 WPS 默认的 GBK (CodePage 936)
+        string content;
+        try
+        {
+            var strictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+            content = strictUtf8.GetString(rawBytes);
+
+            // 顺手剥离可能存在的 UTF-8 BOM 头
+            if (content.Length > 0 && content[0] == '\uFEFF')
+            {
+                content = content.Substring(1);
+            }
+        }
+        catch (DecoderFallbackException)
+        {
+            content = Encoding.GetEncoding(936).GetString(rawBytes);
+        }
+
+        List<List<string>> rows = ParseCsv(content);
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];

@@ -5,6 +5,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 public class IntroCmdSequenceController : MonoBehaviour
 {
@@ -35,6 +39,13 @@ public class IntroCmdSequenceController : MonoBehaviour
     [SerializeField] private int asciiCharsPerStep = 8;      // 每次刷出的字符数（越大越快）
     [SerializeField] private float asciiStepInterval = 0.01f; // 每次刷新的时间间隔（秒）
 
+    [Header("选项组动态排版")]
+    [SerializeField] private float choiceTopSpacing = 24f; // 按钮组距离上方文本最后一行的间距（像素）
+
+    [Header("退出按钮劫持配置")]
+    [SerializeField] private string abortReplyTextKey = "intro_cmd_abort_reply";
+    [SerializeField] private Image cmdBgImage; // 拖入 CMD_Intact_Bg，用于触发终端底图 Glitch
+
     [Header("阶段 2 & 3：实体化猫头与扒边猫爪")]
     [SerializeField] private CanvasGroup catHeadGroup;
     [SerializeField] private RectTransform catHeadRect;
@@ -53,6 +64,11 @@ public class IntroCmdSequenceController : MonoBehaviour
     [SerializeField] private ShatterShard[] shards;
     [SerializeField] private MainMenuController mainMenuController;
     [SerializeField] private RectTransform mainMenuCatRect; // 直接拖入 Layer_MainMenu 里的 Cat 容器
+
+    [Header("碎片飞散节奏控制")]
+    [SerializeField] private float shardMoveDuration = 0.22f; // 所有碎片同时飞到目标位的耗时（越小越干脆）
+    [SerializeField] private float shardHoldDuration = 0.08f; // 到达目标位后的极短定格时间（填 0 则到达立刻消失）
+    [SerializeField] private float shardFadeDuration = 0.15f; // 消失耗时（填 0 则瞬间隐藏，不淡出）
 
     [Header("终端文本 Key")]
     [SerializeField] private string warningTextKey = "intro_cmd_warning";
@@ -94,6 +110,19 @@ public class IntroCmdSequenceController : MonoBehaviour
         StartCoroutine(PlayTerminalWarningRoutine());
     }
 
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F12))
+        {
+            PlayerPrefs.DeleteAll();
+            PlayerPrefs.Save();
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+        }
+    }
+#endif
+
     private void InitIntroState()
     {
         if (mainMenuController != null) mainMenuController.gameObject.SetActive(false);
@@ -110,6 +139,7 @@ public class IntroCmdSequenceController : MonoBehaviour
             _runtimeGlitchMat = new Material(glitchMaterialTemplate);
             _runtimeGlitchMat.SetFloat(GlitchIntensityId, 0f);
 
+            if (cmdBgImage != null) cmdBgImage.material = _runtimeGlitchMat;
             if (catHeadImage != null) catHeadImage.material = _runtimeGlitchMat;
             if (catPawsImage != null) catPawsImage.material = _runtimeGlitchMat;
         }
@@ -121,8 +151,17 @@ public class IntroCmdSequenceController : MonoBehaviour
             choiceGroup.blocksRaycasts = false;
         }
 
-        if (btnContinue != null) btnContinue.onClick.AddListener(OnConfirmContinue);
-        if (btnAbort != null) btnAbort.onClick.AddListener(() => Application.Quit());
+        if (btnContinue != null)
+        {
+            btnContinue.onClick.RemoveAllListeners();
+            btnContinue.onClick.AddListener(OnConfirmContinue);
+        }
+
+        if (btnAbort != null)
+        {
+            btnAbort.onClick.RemoveAllListeners();
+            btnAbort.onClick.AddListener(OnAbortClicked);
+        }
     }
     private string GetRealGameDirectory()
     {
@@ -136,23 +175,40 @@ public class IntroCmdSequenceController : MonoBehaviour
         return rawPath.Replace('/', '\\');
     }
 
+    private static readonly Regex WaitTagRegex = new Regex(@"<wait=([0-9]*\.?[0-9]+)>", RegexOptions.IgnoreCase);
+
     private IEnumerator PlayTerminalWarningRoutine()
     {
         // CMD 窗口微弹出现
         cmdWindowRoot.localScale = Vector3.one * 0.92f;
         cmdWindowRoot.DOScale(1f, 0.22f).SetEase(Ease.OutBack);
 
-        // 逐字打出风险提示
-        string localizedWarning = LocalizationManager.GetText(warningTextKey)
-    .Replace("{path}", GetRealGameDirectory());
+        string rawWarning = LocalizationManager.GetText(warningTextKey)
+            .Replace("{path}", GetRealGameDirectory());
 
-        txtTerminal.text = localizedWarning;
+        // 剥离 <wait=x> 标签，并计算每个停顿点对应的真实可见字符位置
+        string cleanWarning = ExtractWaitPoints(rawWarning, txtTerminal, out Dictionary<int, float> pausePoints);
+
         txtTerminal.maxVisibleCharacters = 0;
+        txtTerminal.text = cleanWarning;
+        UpdateChoiceGroupPosition(smoothMove: false);
+        txtTerminal.ForceMeshUpdate();
 
-        for (int i = 0; i <= localizedWarning.Length; i++)
+        int totalVisibleChars = txtTerminal.textInfo.characterCount;
+
+        for (int i = 0; i <= totalVisibleChars; i++)
         {
             txtTerminal.maxVisibleCharacters = i;
-            yield return new WaitForSeconds(0.022f);
+
+            // 命中停顿点时暂停指定秒数
+            if (pausePoints.TryGetValue(i, out float waitSeconds))
+            {
+                yield return new WaitForSeconds(waitSeconds);
+            }
+            else
+            {
+                yield return new WaitForSeconds(0.022f);
+            }
         }
 
         // 显示选项
@@ -166,8 +222,78 @@ public class IntroCmdSequenceController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 根据 txtTerminal 当前文本的完整排版高度，将 Choice_Group 定位到文本正下方
+    /// </summary>
+    private void UpdateChoiceGroupPosition(bool smoothMove = false)
+    {
+        if (txtTerminal == null || choiceGroup == null) return;
+
+        txtTerminal.ForceMeshUpdate();
+        RectTransform textRect = txtTerminal.rectTransform;
+        RectTransform choiceRect = choiceGroup.GetComponent<RectTransform>();
+
+        // 计算文本框顶边在父容器中的局部 Y 坐标（不受 Pivot 影响）
+        float textTopLocalY = textRect.localPosition.y + (1f - textRect.pivot.y) * textRect.rect.height;
+        // 减去文本实际渲染总高度，得到最后一行文字的底边位置
+        float textBottomLocalY = textTopLocalY - txtTerminal.preferredHeight;
+
+        // 计算按钮组目标局部 Y 坐标，使其顶边与文本底边保持 choiceTopSpacing 间距
+        float targetChoiceLocalY = textBottomLocalY - choiceTopSpacing - (1f - choiceRect.pivot.y) * choiceRect.rect.height;
+
+        choiceRect.DOKill();
+        if (smoothMove)
+        {
+            choiceRect.DOLocalMoveY(targetChoiceLocalY, 0.22f).SetEase(Ease.OutQuart);
+        }
+        else
+        {
+            Vector3 pos = choiceRect.localPosition;
+            pos.y = targetChoiceLocalY;
+            choiceRect.localPosition = pos;
+        }
+    }
+
+    /// <summary>
+    /// 解析文本中的 <wait=秒数> 标签，返回去除 wait 标签后的干净文本及停顿映射表
+    /// （借助 TMP 的 ForceMeshUpdate 自动排除 <color> 等富文本标签对字数索引的干扰）
+    /// </summary>
+    private string ExtractWaitPoints(string rawText, TMP_Text targetTmp, out Dictionary<int, float> pausePoints)
+    {
+        pausePoints = new Dictionary<int, float>();
+        StringBuilder cleanBuilder = new StringBuilder();
+        int lastIndex = 0;
+
+        targetTmp.maxVisibleCharacters = 0;
+
+        foreach (Match match in WaitTagRegex.Matches(rawText))
+        {
+            cleanBuilder.Append(rawText, lastIndex, match.Index - lastIndex);
+
+            if (float.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float waitSec))
+            {
+                targetTmp.text = cleanBuilder.ToString();
+                targetTmp.ForceMeshUpdate();
+                int visibleIdx = targetTmp.textInfo.characterCount;
+
+                if (pausePoints.ContainsKey(visibleIdx))
+                    pausePoints[visibleIdx] += waitSec;
+                else
+                    pausePoints[visibleIdx] = waitSec;
+            }
+
+            lastIndex = match.Index + match.Length;
+        }
+
+        cleanBuilder.Append(rawText, lastIndex, rawText.Length - lastIndex);
+        return cleanBuilder.ToString();
+    }
+
     private void OnConfirmContinue()
     {
+        StopAllCoroutines();
+        if (_runtimeGlitchMat != null) _runtimeGlitchMat.SetFloat(GlitchIntensityId, 0f);
+
         if (choiceGroup != null)
         {
             choiceGroup.interactable = false;
@@ -176,6 +302,101 @@ public class IntroCmdSequenceController : MonoBehaviour
         }
 
         StartCoroutine(PlayMaterializeAndShatterRoutine());
+    }
+    private void OnAbortClicked()
+    {
+        // 1. 禁用退出按钮并加上删除线与变暗效果
+        if (btnAbort != null)
+        {
+            btnAbort.interactable = false;
+            TMP_Text abortTmp = btnAbort.GetComponentInChildren<TMP_Text>();
+            if (abortTmp != null)
+            {
+                abortTmp.text = $"<s>{abortTmp.text}</s>";
+                abortTmp.alpha = 0.35f;
+            }
+        }
+
+        // 2. 立即隐藏选项组并锁定交互，防止乱码清空期间误触
+        if (choiceGroup != null)
+        {
+            choiceGroup.DOKill();
+            choiceGroup.alpha = 0f;
+            choiceGroup.interactable = false;
+            choiceGroup.blocksRaycasts = false;
+        }
+
+        StopAllCoroutines();
+        StartCoroutine(PlayAbortRefusalRoutine());
+    }
+
+    private IEnumerator PlayAbortRefusalRoutine()
+    {
+        // 1. 终端底图触发 Glitch，文字乱码闪烁并横向错位
+        if (_runtimeGlitchMat != null)
+        {
+            StartCoroutine(PlayGlitchBurst(0.24f, 0.9f));
+        }
+
+        RectTransform textRect = txtTerminal.rectTransform;
+        Vector2 originPos = textRect.anchoredPosition;
+        const string glitchChars = "#@%&*!?/\\|=-+~";
+
+        for (int step = 0; step < 4; step++)
+        {
+            float offsetX = UnityEngine.Random.Range(-10f, 10f);
+            textRect.anchoredPosition = originPos + new Vector2(offsetX, 0f);
+
+            int len = Mathf.Min(txtTerminal.textInfo.characterCount, 120);
+            StringBuilder sb = new StringBuilder(len);
+            for (int c = 0; c < len; c++)
+            {
+                char orig = txtTerminal.textInfo.characterInfo[c].character;
+                sb.Append(orig == '\n' ? '\n' : glitchChars[UnityEngine.Random.Range(0, glitchChars.Length)]);
+            }
+            txtTerminal.text = sb.ToString();
+            txtTerminal.maxVisibleCharacters = len;
+
+            yield return new WaitForSeconds(0.045f);
+        }
+
+        // 2. 复位坐标并清空屏幕
+        textRect.anchoredPosition = originPos;
+        txtTerminal.text = string.Empty;
+        yield return new WaitForSeconds(0.15f);
+
+        // 3. 准备劝留台词，并在选项组隐藏状态下静默更新到新文本正下方
+        string rawReply = LocalizationManager.GetText(abortReplyTextKey);
+        string cleanReply = ExtractWaitPoints(rawReply, txtTerminal, out Dictionary<int, float> pausePoints);
+
+        txtTerminal.maxVisibleCharacters = 0;
+        txtTerminal.text = cleanReply;
+        UpdateChoiceGroupPosition(smoothMove: false);
+
+        // 4. 逐字打出 DH_BOT 台词
+        int totalVisibleChars = txtTerminal.textInfo.characterCount;
+        for (int i = 0; i <= totalVisibleChars; i++)
+        {
+            txtTerminal.maxVisibleCharacters = i;
+
+            if (pausePoints.TryGetValue(i, out float waitSeconds))
+                yield return new WaitForSeconds(waitSeconds);
+            else
+                yield return new WaitForSeconds(0.025f);
+        }
+
+        // 5. 打字结束后，重新淡入显示选项组并恢复交互
+        if (choiceGroup != null)
+        {
+            choiceGroup.interactable = true;
+            choiceGroup.blocksRaycasts = true;
+            choiceGroup.DOFade(1f, 0.2f);
+        }
+
+        if (btnContinue != null)
+        {
+            btnContinue.transform.DOPunchScale(Vector3.one * 0.08f, 0.25f, 6, 0.5f);
+        }
     }
 
     private IEnumerator PlayMaterializeAndShatterRoutine()
@@ -264,23 +485,52 @@ public class IntroCmdSequenceController : MonoBehaviour
         PlayerPrefs.SetInt(PrefKeyIntroPlayed, 1);
         PlayerPrefs.Save();
 
-        // 记录 CMD 窗口中心的世界坐标
-        Vector3 burstOrigin = cmdWindowRoot.position;
+        // 直接取猫头（或 CMD_Intact_Bg）的真实世界坐标，避免父容器中心点偏移
+        Vector3 burstOrigin = catHeadRect != null ? catHeadRect.position : cmdWindowRoot.position;
 
         // 瞬间切换：隐藏完整 CMD，激活碎片组
         cmdWindowRoot.gameObject.SetActive(false);
         if (cmdShardsGroup != null) cmdShardsGroup.SetActive(true);
 
-        // 碎片向四周炸开并旋转淡出
+        // 碎片同时快速移动到目标位置，到位后再统一消失
         Sequence shatterSeq = DOTween.Sequence();
+        float disappearStartTime = shardMoveDuration + shardHoldDuration;
+
         foreach (var s in shards)
         {
             if (s.shardRect == null) continue;
-            shatterSeq.Join(s.shardRect.DOAnchorPos(s.shardRect.anchoredPosition + s.flyOffset, 0.55f).SetEase(Ease.OutQuart));
-            shatterSeq.Join(s.shardRect.DOLocalRotate(new Vector3(0f, 0f, s.flyRotateZ), 0.55f).SetEase(Ease.OutQuad));
+
+            // 1. 第 0 秒：所有碎片同时高速冲向目标位置并旋转
+            shatterSeq.Insert(0f, s.shardRect
+                .DOAnchorPos(s.shardRect.anchoredPosition + s.flyOffset, shardMoveDuration)
+                .SetEase(Ease.OutExpo));
+
+            shatterSeq.Insert(0f, s.shardRect
+                .DOLocalRotate(new Vector3(0f, 0f, s.flyRotateZ), shardMoveDuration)
+                .SetEase(Ease.OutExpo));
+
+            // 2. 全部到达目标位置并定格后，再统一消失
             if (s.shardGroup != null)
-                shatterSeq.Join(s.shardGroup.DOFade(0f, 0.45f).SetDelay(0.12f));
+            {
+                s.shardGroup.alpha = 1f;
+                if (shardFadeDuration > 0f)
+                {
+                    shatterSeq.Insert(disappearStartTime, s.shardGroup.DOFade(0f, shardFadeDuration));
+                }
+            }
         }
+
+        // 如果 shardFadeDuration 设为 0（瞬间消失），确保序列至少等到定格结束再关闭物体
+        if (shardFadeDuration <= 0f)
+        {
+            shatterSeq.InsertCallback(disappearStartTime, () => { });
+        }
+
+        shatterSeq.OnComplete(() =>
+        {
+            if (cmdShardsGroup != null) cmdShardsGroup.SetActive(false);
+            gameObject.SetActive(false);
+        });
 
         // 唤醒主菜单，所有元素从 CMD 窗口中心弹出
         if (mainMenuController != null)

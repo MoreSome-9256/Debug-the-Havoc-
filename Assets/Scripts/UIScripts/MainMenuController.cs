@@ -14,8 +14,8 @@ public class MainMenuController : MonoBehaviour
     [Header("破窗出场：黑猫 Glitch 与斜上方跳跃")]
     [SerializeField] private Material glitchMaterialTemplate;   // 拖入之前的 Mat_UI_Glitch
     [Tooltip("斜上方冲刺的额外过冲偏移（正 X 向右、正 Y 向上）")]
-    [SerializeField] private Vector2 catLeapOvershoot = new Vector2(55f, 110f);
-    [SerializeField] private float catGlitchDuration = 0.28f;
+    [SerializeField] private float catLeapDuration = 0.65f;     // 黑猫从左下飞跃到主菜单原位的总时长（秒）
+    [SerializeField] private float catGlitchDuration = 0.45f;   // 同步拉长一点 Glitch 覆盖整个起跳过程
 
     private Material _catGlitchMat;
     private static readonly int GlitchIntensityId = Shader.PropertyToID("_GlitchIntensity");
@@ -107,34 +107,22 @@ public class MainMenuController : MonoBehaviour
             menuCanvasGroup.blocksRaycasts = true;
         }
 
-        // 1. 黑猫带着 Glitch 猛地向斜上方跃出，再落回屏幕中央
+        // 1. 黑猫带着 Glitch 从左下斜向上飞跃到主菜单原位
         if (mascotCatRect != null)
         {
-            // 起跳瞬间触发 Glitch 故障闪烁
             if (_catGlitchMat != null)
             {
                 StartCoroutine(PlayCatGlitchBurst(catGlitchDuration, 1.0f));
             }
 
             mascotCatRect.position = originWorldPos;
-            mascotCatRect.localScale = Vector3.one * 0.6f;
-            mascotCatRect.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            mascotCatRect.localScale = Vector3.one * 0.65f;
+            mascotCatRect.localRotation = Quaternion.Euler(0f, 0f, -15f);
 
-            // 计算斜上方最高点（在最终落点基础上再向右上冲出去一段）
-            Vector3 apexLocalPos = _catBaseLocalPos + (Vector3)catLeapOvershoot;
-
-            Sequence catLeapSeq = DOTween.Sequence();
-            // 阶段 A：向斜上方爆发冲刺
-            catLeapSeq.Append(mascotCatRect.DOLocalMove(apexLocalPos, 0.22f).SetEase(Ease.OutQuart));
-            catLeapSeq.Join(mascotCatRect.DOScale(1.08f, 0.22f).SetEase(Ease.OutQuad));
-            catLeapSeq.Join(mascotCatRect.DOLocalRotate(new Vector3(0f, 0f, 6f), 0.22f).SetEase(Ease.OutQuad));
-
-            // 阶段 B：从斜上方轻盈回落到主菜单中心位
-            catLeapSeq.Append(mascotCatRect.DOLocalMove(_catBaseLocalPos, 0.24f).SetEase(Ease.InOutQuad));
-            catLeapSeq.Join(mascotCatRect.DOScale(1f, 0.24f).SetEase(Ease.OutBack, 1.2f));
-            catLeapSeq.Join(mascotCatRect.DOLocalRotate(Vector3.zero, 0.24f).SetEase(Ease.OutQuad));
-
-            _entranceSeq.Insert(0f, catLeapSeq);
+            // 位移、缩放、旋转按 catLeapDuration 同步推进
+            _entranceSeq.Insert(0f, mascotCatRect.DOLocalMove(_catBaseLocalPos, catLeapDuration).SetEase(Ease.OutBack, 1.05f));
+            _entranceSeq.Insert(0f, mascotCatRect.DOScale(1f, catLeapDuration * 0.9f).SetEase(Ease.OutBack, 1.1f));
+            _entranceSeq.Insert(0f, mascotCatRect.DOLocalRotate(Vector3.zero, catLeapDuration * 0.95f).SetEase(Ease.OutQuart));
         }
 
         // 2. 背景底框 Window1 紧随其后展开

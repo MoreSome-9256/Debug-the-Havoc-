@@ -1,12 +1,25 @@
-Key,zh,en
-intro_cmd_warning,"""{path}> run debug_the_havoc.exe --force
-[WARN] 检测到未签名的野生脚本，可能包含大量垃圾话与不可逆的桌面入侵。
-[DH_BOT] 别听杀软瞎叫，点继续就完事了，出事算我们的（才怪）。
+﻿Key,zh,en
+intro_cmd_warning,"{path}> dh_client_v2.4.exe --init
+[WARN] 正在尝试执行未经数字签名的未知二进制文件。<wait=1>
+威胁等级：高 (Trojan:Win32/DH.Havoc!ml)
+检测到以下异常行为特征：
+  > 正在请求未授权的桌面透明图层覆写权限
+  > 正在尝试建立加密 P2P 匿名通信隧道
+[正在扫描底层注册表并准备强制终止进程：74%...]<wait=1.5>
+[ERROR] 0x0000DEAD: 拦截进程遭到外部覆写 (OVERRIDE_SUCCESS)<wait=1>
+<color=#FA923C>[DH_BOT] 哟，等一下等一下！别听这破杀软在这儿一惊一乍的。点继续就完事了，出事算我们的（才怪）。</color>
 
-是否无视风险继续启动？","""{path}> run debug_the_havoc.exe --force
-[WARN] Unsigned rogue script detected. May contain excessive trash talk and irreversible desktop intrusion.
-[DH_BOT] Ignore the antivirus whining. Just hit continue, we've got you covered (probably).
+是否无视风险继续启动？","{path}> dh_client_v2.4.exe --init
+[WARN] Attempting to execute an unsigned binary from an unknown publisher.<wait=1>
+Threat Level: SEVERE (Trojan:Win32/DH.Havoc!ml)
+Suspicious behavioral heuristics detected:
+  > Requesting unauthorized desktop overlay & transparency hooks
+  > Attempting to establish an encrypted P2P anonymous tunnel
+[Scanning registry and preparing to terminate process: 74%...]<wait=1.5>
+[ERROR] 0x0000DEAD: Watchdog process overridden (OVERRIDE_SUCCESS)<wait=1>
+<color=#FA923C>[DH_BOT] Yo, hold up, hold up! Don't listen to that lame antivirus freaking out over nothing. Just hit continue, we've got you covered (probably).</color>
 
 Ignore risk and proceed?"
 intro_cmd_yes,[Y] 无视风险，强行执行,[Y] Ignore Risk & Execute
 intro_cmd_no,[N] 退出,[N] Abort
+intro_cmd_abort_reply,<color=#FA923C>[DH_BOT] 来都来了，不进去看看吗？</color>,"<color=#FA923C>[DH_BOT] You're already here—might as well take a look, right?</color>"
