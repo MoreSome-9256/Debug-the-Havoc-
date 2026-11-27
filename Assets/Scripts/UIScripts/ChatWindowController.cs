@@ -40,6 +40,8 @@ public class ChatWindowController : DraggableWindow
     [Header("半隐藏位移与动效参数 (基于 4K 画布)")]
     [SerializeField] private float collapsedPosY = -920f;
     [SerializeField] private float animDuration = 0.28f;
+    // 在类字段区新增缓存数组，避免拖拽时每帧产生 GC
+    private readonly Vector3[] _previewWorldCorners = new Vector3[4];
 
     [Header("联动窗口")]
     [SerializeField] private DraggableWindow codeEditorWindow;
@@ -235,19 +237,45 @@ public class ChatWindowController : DraggableWindow
 
         if (_isCollapsed)
         {
-            // 折叠状态下死锁 Y 轴贴紧屏幕底边，同时限制 X 轴不拖出屏幕左右边界
-            float clampedX = windowRect.anchoredPosition.x;
+            // 1. 先死锁 Y 轴到折叠高度
+            windowRect.anchoredPosition = new Vector2(windowRect.anchoredPosition.x, collapsedPosY);
+
+            // 2. 直接按折叠态实际显示的 miniPreviewBarRoot 边界限制 X 轴
             if (windowRect.parent is RectTransform parentRect)
             {
-                float halfParentWidth = parentRect.rect.width * 0.5f;
-                float halfWinWidth = windowRect.rect.width * 0.5f;
-                float minX = -halfParentWidth + halfWinWidth - 60f;
-                float maxX = halfParentWidth - halfWinWidth + 60f;
-                if (minX < maxX)
-                    clampedX = Mathf.Clamp(clampedX, minX, maxX);
-            }
+                RectTransform visibleRect = miniPreviewBarRoot != null
+                    ? miniPreviewBarRoot.GetComponent<RectTransform>()
+                    : windowRect;
 
-            windowRect.anchoredPosition = new Vector2(clampedX, collapsedPosY);
+                visibleRect.GetWorldCorners(_previewWorldCorners);
+
+                float minCornerX = float.MaxValue;
+                float maxCornerX = float.MinValue;
+                for (int i = 0; i < 4; i++)
+                {
+                    float localX = parentRect.InverseTransformPoint(_previewWorldCorners[i]).x;
+                    if (localX < minCornerX) minCornerX = localX;
+                    if (localX > maxCornerX) maxCornerX = localX;
+                }
+
+                const float edgeOverflow = 60f;
+                float allowedMinX = parentRect.rect.xMin - edgeOverflow;
+                float allowedMaxX = parentRect.rect.xMax + edgeOverflow;
+
+                if (maxCornerX - minCornerX <= allowedMaxX - allowedMinX)
+                {
+                    float deltaX = 0f;
+                    if (minCornerX < allowedMinX) deltaX = allowedMinX - minCornerX;
+                    else if (maxCornerX > allowedMaxX) deltaX = allowedMaxX - maxCornerX;
+
+                    if (!Mathf.Approximately(deltaX, 0f))
+                    {
+                        Vector3 localPos = windowRect.localPosition;
+                        localPos.x += deltaX;
+                        windowRect.localPosition = localPos;
+                    }
+                }
+            }
         }
         else
         {

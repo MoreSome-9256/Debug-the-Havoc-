@@ -102,6 +102,25 @@ public static class SaveManager
     }
 
     /// <summary>
+    /// 仅读取存档元数据用于 UI 展示（不覆盖当前的 CurrentSave 状态）
+    /// </summary>
+    public static GameSaveData PeekSave()
+    {
+        if (CurrentSave != null) return CurrentSave;
+        if (!HasSave()) return null;
+
+        try
+        {
+            string json = File.ReadAllText(SaveFilePath);
+            return JsonUtility.FromJson<GameSaveData>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 计算距离上次保存过去了多少现实秒数（供 sync 挂机模式推进离线事件）
     /// </summary>
     public static long GetOfflineElapsedSeconds()

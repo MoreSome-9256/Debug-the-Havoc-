@@ -25,3 +25,6 @@ intro_cmd_no,[N] 退出,[N] Abort
 intro_cmd_abort_reply,<color=#FA923C>[DH_BOT] 来都来了，不进去看看吗？</color>,"<color=#FA923C>[DH_BOT] You're already here—might as well take a look, right?</color>"
 mode_sync_desc,挂机模式，游戏时间与现实时间同步，剧情最全，推荐初见选择。,Idle Mode — In-game time syncs with real time. Features the complete story experience. Recommended for your first playthrough.
 mode_overclock_desc,剧情模式，主线任务点不受时间控制，适合多周目与实况。,Story Mode — Main story progression is free from real-time locks. Ideal for repeat playthroughs and streaming.
+overwrite_save_desc,"本地已存在未完结的潜入记录（模式：{0} | 上次同步：{1}）。\n开启新游戏将彻底覆写原有进度且无法恢复，是否确认继续？","An active dive record already exists (Mode: {0} | Last Sync: {1}).\nStarting a new game will permanently overwrite your progress. Continue?"
+overwrite_btn_confirm,[Y] 确认覆写,[Y] Confirm Overwrite
+overwrite_btn_cancel,[N] 取消并返回,[N] Cancel

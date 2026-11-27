@@ -31,6 +31,7 @@ public class MainMenuController : MonoBehaviour
     [Header("进入游戏后的桌面窗口")]
     [SerializeField] private ChatWindowController chatWindow;
     [SerializeField] private ModeSelectionController modeSelectionController;
+    [SerializeField] private OverwriteConfirmDialog overwriteConfirmDialog;
 
     private Sequence _entranceSeq;
     private Tween _catFloatTween;
@@ -230,9 +231,18 @@ public class MainMenuController : MonoBehaviour
     }
     private void OnNewGameClicked()
     {
-        if (modeSelectionController != null)
+        if (SaveManager.HasSave() && overwriteConfirmDialog != null)
         {
-            modeSelectionController.Open();
+            overwriteConfirmDialog.Open(() =>
+            {
+                if (modeSelectionController != null)
+                    modeSelectionController.Open();
+            });
+        }
+        else
+        {
+            if (modeSelectionController != null)
+                modeSelectionController.Open();
         }
     }
 
