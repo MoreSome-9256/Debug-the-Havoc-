@@ -23,3 +23,5 @@ Ignore risk and proceed?"
 intro_cmd_yes,[Y] 无视风险，强行执行,[Y] Ignore Risk & Execute
 intro_cmd_no,[N] 退出,[N] Abort
 intro_cmd_abort_reply,<color=#FA923C>[DH_BOT] 来都来了，不进去看看吗？</color>,"<color=#FA923C>[DH_BOT] You're already here—might as well take a look, right?</color>"
+mode_sync_desc,挂机模式，游戏时间与现实时间同步，剧情最全，推荐初见选择。,Idle Mode — In-game time syncs with real time. Features the complete story experience. Recommended for your first playthrough.
+mode_overclock_desc,剧情模式，主线任务点不受时间控制，适合多周目与实况。,Story Mode — Main story progression is free from real-time locks. Ideal for repeat playthroughs and streaming.

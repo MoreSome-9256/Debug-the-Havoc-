@@ -29,6 +29,7 @@ public class MainMenuController : MonoBehaviour
 
     [Header("进入游戏后的桌面窗口")]
     [SerializeField] private ChatWindowController chatWindow;
+    [SerializeField] private ModeSelectionController modeSelectionController;
 
     private Sequence _entranceSeq;
     private Tween _catFloatTween;
@@ -185,7 +186,7 @@ public class MainMenuController : MonoBehaviour
 
     private void BindButtonEvents()
     {
-        if (btnInitialize != null) btnInitialize.onClick.AddListener(() => EnterDesktopSession(isNewGame: true));
+        if (btnInitialize != null) btnInitialize.onClick.AddListener(() => OnNewGameClicked());
         if (btnReconnect != null) btnReconnect.onClick.AddListener(() => EnterDesktopSession(isNewGame: false));
         if (btnTerminate != null) btnTerminate.onClick.AddListener(QuitApplication);
 
@@ -199,6 +200,13 @@ public class MainMenuController : MonoBehaviour
                 mascotCatRect.DOPunchScale(new Vector3(0.12f, -0.1f, 0f), 0.35f, 8, 0.6f)
                     .OnComplete(StartCatIdleFloat);
             });
+        }
+    }
+    private void OnNewGameClicked()
+    {
+        if (modeSelectionController != null)
+        {
+            modeSelectionController.Open();
         }
     }
 
