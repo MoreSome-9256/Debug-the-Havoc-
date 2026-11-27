@@ -319,7 +319,7 @@ public class ModeSelectionController : MonoBehaviour
         _activeOptionItem = null;
 
         // 1. 持久化当前存档选择的模式（"sync" 或 "overclock"）
-        PlayerPrefs.SetString("SelectedGameMode", modeId);
+        GameSaveData newSave = SaveManager.CreateNewSave(modeId);
         PlayerPrefs.Save();
 
         // 2. 锁定交互并淡出模式选择层

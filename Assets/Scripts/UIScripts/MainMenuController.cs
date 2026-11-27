@@ -1,4 +1,5 @@
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -182,6 +183,31 @@ public class MainMenuController : MonoBehaviour
         }
 
         _catGlitchMat.SetFloat(GlitchIntensityId, 0f);
+    }
+
+    private void OnEnable()
+    {
+        RefreshContinueButtonState();
+    }
+
+    public void RefreshContinueButtonState()
+    {
+        if (btnReconnect == null) return;
+
+        bool hasSave = SaveManager.HasSave();
+        btnReconnect.interactable = hasSave;
+
+        var skewAnim = btnReconnect.GetComponentInParent<MenuSkewButtonAnimator>();
+        if (skewAnim != null)
+        {
+            skewAnim.SetInteractable(hasSave);
+        }
+
+        TMP_Text btnText = btnReconnect.GetComponentInChildren<TMP_Text>();
+        if (btnText != null)
+        {
+            btnText.alpha = hasSave ? 1f : 0.35f;
+        }
     }
 
     private void BindButtonEvents()

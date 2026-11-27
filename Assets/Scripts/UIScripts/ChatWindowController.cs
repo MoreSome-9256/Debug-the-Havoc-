@@ -255,4 +255,10 @@ public class ChatWindowController : DraggableWindow
             _expandedAnchoredPos = windowRect.anchoredPosition;
         }
     }
+
+    // ×Ô¶¯´æµµ
+    private void OnApplicationQuit()
+    {
+        SaveManager.AutoSave();
+    }
 }
