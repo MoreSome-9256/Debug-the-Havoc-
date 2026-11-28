@@ -8,7 +8,7 @@ public class SessionData
     public string sessionId;
     public string displayName;
     public Sprite avatarSprite;
-    public float lastMessageTime;
+    public double lastMessageTime;
 }
 
 [RequireComponent(typeof(LayoutElement))]

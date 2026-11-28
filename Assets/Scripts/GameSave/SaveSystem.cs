@@ -6,22 +6,45 @@ using UnityEngine;
 [Serializable]
 public class GameSaveData
 {
-    public string gameMode = "sync";          // "sync"（挂机同步）或 "overclock"（剧情超频）
+    public string gameMode = "overclock";     // "sync"（挂机同步）或 "overclock"（剧情超频）
     public string currentChapterId = "ch01";  // 当前所处章节/阶段
     public long createdUnixTime;              // 开档时的现实时间戳（秒）
     public long lastSavedUnixTime;            // 上次自动保存时的现实时间戳（用于计算离线时长）
 
-    // 后续做聊天与桌面事件时直接往这里追加字段：
+    // 虚拟时钟基准与进度
+    public long virtualClockSeconds;          // 当前虚拟时钟累计秒数
+    public string preferredActiveSlot = "night"; // 玩家偏好的活跃时段 ("morning" / "afternoon" / "night")
+
+    // Ink 虚拟机状态快照（调用 _inkStory.state.ToJson() 存入，读档时可直接恢复对话位置与变量）
+    public string inkStateJson;
+
+    // 隐藏好感度与多周目档案
+    public List<CharacterAffinityEntry> affinities = new List<CharacterAffinityEntry>();
+    public List<string> unlockedPrivateSessions = new List<string>(); // 已解锁出现在侧边栏的私聊角色ID
+    public bool isGameCompleted = false;      // 是否已通关（决定重启后是否进入只读离线归档界面）
+
+    // 事件与全频道聊天记录
     public List<string> triggeredEventIds = new List<string>();
     public List<ChatMessageRecord> chatHistory = new List<ChatMessageRecord>();
 }
 
 [Serializable]
+public class CharacterAffinityEntry
+{
+    public string characterId;
+    public int affinity;
+}
+
+[Serializable]
 public class ChatMessageRecord
 {
-    public string senderId;
-    public string contentKeyOrText;
-    public long timestamp;
+    public string messageId;          // 唯一消息ID（用于支持消息撤回定位）
+    public string sessionId;          // 所属频道 ("group_dh" 或私聊角色ID，为空时兼容默认大群)
+    public string senderId;           // 发言人ID ("player" 或角色ID)
+    public string contentKeyOrText;   // 文本内容 或 表情包/图片资源Key
+    public string messageType = "text"; // "text" | "sticker" | "image" | "system"
+    public long timestamp;            // 虚拟时间戳（秒）
+    public bool isRecalled;           // 是否已被撤回
 }
 
 public static class SaveManager
@@ -31,17 +54,11 @@ public static class SaveManager
 
     public static GameSaveData CurrentSave { get; private set; }
 
-    /// <summary>
-    /// 检测本地是否存在有效自动存档（决定“继续潜入”按钮是否可用）
-    /// </summary>
     public static bool HasSave()
     {
         return File.Exists(SaveFilePath);
     }
 
-    /// <summary>
-    /// 开启新游戏：创建全新存档并立即写入本地（覆盖旧档）
-    /// </summary>
     public static GameSaveData CreateNewSave(string modeId)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -50,16 +67,14 @@ public static class SaveManager
             gameMode = modeId,
             currentChapterId = "ch01_intro",
             createdUnixTime = now,
-            lastSavedUnixTime = now
+            lastSavedUnixTime = now,
+            virtualClockSeconds = now
         };
 
         AutoSave();
         return CurrentSave;
     }
 
-    /// <summary>
-    /// 读取现有存档（点击“继续潜入”时调用）
-    /// </summary>
     public static GameSaveData LoadSave()
     {
         if (!HasSave())
@@ -81,9 +96,6 @@ public static class SaveManager
         }
     }
 
-    /// <summary>
-    /// 触发自动存档（在关键对话结束、选项确认、游戏退出时调用）
-    /// </summary>
     public static void AutoSave()
     {
         if (CurrentSave == null) return;
@@ -91,7 +103,6 @@ public static class SaveManager
         CurrentSave.lastSavedUnixTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         string json = JsonUtility.ToJson(CurrentSave, prettyPrint: true);
 
-        // 先写入临时文件再替换，避免强退导致 JSON 截断损坏
         string tempPath = SaveFilePath + ".tmp";
         File.WriteAllText(tempPath, json);
         if (File.Exists(SaveFilePath))
@@ -101,9 +112,6 @@ public static class SaveManager
         File.Move(tempPath, SaveFilePath);
     }
 
-    /// <summary>
-    /// 仅读取存档元数据用于 UI 展示（不覆盖当前的 CurrentSave 状态）
-    /// </summary>
     public static GameSaveData PeekSave()
     {
         if (CurrentSave != null) return CurrentSave;
@@ -120,9 +128,6 @@ public static class SaveManager
         }
     }
 
-    /// <summary>
-    /// 计算距离上次保存过去了多少现实秒数（供 sync 挂机模式推进离线事件）
-    /// </summary>
     public static long GetOfflineElapsedSeconds()
     {
         if (CurrentSave == null) return 0;
@@ -131,8 +136,28 @@ public static class SaveManager
     }
 
     /// <summary>
-    /// 调试/重置用：删除当前存档
+    /// 修改指定角色隐藏好感度
     /// </summary>
+    public static void ModifyAffinity(string characterId, int delta)
+    {
+        if (CurrentSave == null || string.IsNullOrEmpty(characterId)) return;
+
+        var entry = CurrentSave.affinities.Find(a => a.characterId == characterId);
+        if (entry == null)
+        {
+            entry = new CharacterAffinityEntry { characterId = characterId, affinity = 0 };
+            CurrentSave.affinities.Add(entry);
+        }
+        entry.affinity += delta;
+    }
+
+    public static int GetAffinity(string characterId)
+    {
+        if (CurrentSave == null) return 0;
+        var entry = CurrentSave.affinities.Find(a => a.characterId == characterId);
+        return entry != null ? entry.affinity : 0;
+    }
+
     public static void DeleteSave()
     {
         CurrentSave = null;
